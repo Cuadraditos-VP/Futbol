@@ -1,0 +1,730 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fútbol con amigos</title>
+<meta name="description" content="Anotate a los partidos de la semana y sorteá los equipos.">
+<meta name="theme-color" content="#1f8a4c">
+<meta name="color-scheme" content="only light">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Fútbol">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>
+  :root{
+    --bg:#f3f6f4; --card:#fff; --txt:#1c2421; --muted:#6b7772; --line:#dfe6e2;
+    --verde:#1f8a4c; --verde-claro:#e5f4ea; --rojo:#c0392b; --amarillo:#fff6d6;
+    --chip:#eef1ff; --chip-txt:#3b4cc0;
+  }
+  :root{color-scheme:only light}
+  *{box-sizing:border-box}
+  [hidden]{display:none !important}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt)}
+  main{max-width:520px;margin:0 auto;padding:20px 16px 40px}
+  h1{margin:0 0 12px;font-size:1.6rem;display:flex;align-items:center;gap:10px}
+  h1 img{width:36px;height:36px}
+  .instalar{display:flex;align-items:center;gap:10px;justify-content:space-between}
+  .instalar p{margin:0;font-size:.95rem}
+  .instalar button{flex:0 0 auto;padding:10px 14px}
+  .sub{color:var(--muted);margin:0 0 16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
+  .estado{font-weight:600;padding:10px 12px;border-radius:10px;margin-bottom:12px}
+  .estado.abierto{background:var(--verde-claro);color:var(--verde)}
+  .estado.cerrado{background:var(--amarillo)}
+  .hola{margin:0 0 10px}
+  input[type=text],input[type=time],input[type=number],select{min-width:0;padding:11px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--txt);font-size:1rem;font-family:inherit}
+  input[type=text]{flex:1}
+  button{padding:12px 16px;border:0;border-radius:10px;background:var(--verde);color:#fff;font-weight:600;font-size:1rem;cursor:pointer;font-family:inherit}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .sec{background:var(--bg);color:var(--txt);border:1px solid var(--line)}
+  .peligro{background:none;color:var(--rojo);border:1px solid var(--line)}
+  .ancho{width:100%}
+  .check{display:flex;align-items:center;gap:6px;margin:10px 0;font-size:.95rem;cursor:pointer}
+  .check input{width:18px;height:18px}
+  .amigo{display:flex;gap:8px;margin-top:8px}
+  details.sub-amigo{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+  details summary{cursor:pointer;font-weight:600}
+  .msg{min-height:1.2em;margin:8px 0 0;font-size:.9rem;color:var(--rojo)}
+  table{width:100%;border-collapse:collapse}
+  th,td{border-bottom:1px solid var(--line);padding:9px 6px;text-align:left;vertical-align:top}
+  th{font-size:.85rem;color:var(--muted);font-weight:600}
+  td.n{width:2.5em;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+  td.x{width:2em;text-align:right}
+  .quitar{background:none;color:var(--rojo);padding:2px 6px;font-size:1.1rem}
+  .vacio{color:var(--line)}
+  .yo{font-weight:700}
+  .tag{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:999px;font-size:.8rem;background:var(--chip);color:var(--chip-txt);border:0;font-weight:600;cursor:pointer;vertical-align:1px}
+  .tag.guante{cursor:default;background:var(--amarillo);color:var(--txt)}
+  button.tag.guante{cursor:pointer}
+  .tag.guante.off{background:none;border:1px dashed var(--line);color:var(--muted);font-weight:400}
+  .detalle{display:block;font-size:.85rem;color:var(--muted);margin-top:2px}
+  h2{font-size:1.05rem;margin:0 0 8px}
+  .cupo{float:right;color:var(--muted);font-weight:400;font-size:.9rem}
+  .fila{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
+  .fila label{flex:1;min-width:150px}
+  .equipos{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .equipos ol{margin:6px 0 0;padding-left:1.4em}
+  .equipos li{padding:3px 0}
+  .equipos h3{margin:0;font-size:.95rem}
+  .aviso{font-size:.85rem;color:var(--muted);margin:8px 0 0}
+  .demo{font-size:.85rem;color:var(--muted);text-align:center}
+  /* Selector de partidos */
+  .tabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:12px;scrollbar-width:thin}
+  .tab{flex:0 0 auto;background:var(--card);color:var(--txt);border:1px solid var(--line);padding:8px 12px;border-radius:12px;text-align:left;font-weight:400;line-height:1.25}
+  .tab b{display:block;font-size:.95rem}
+  .tab small{color:var(--muted);font-size:.8rem}
+  .tab.activo{background:var(--verde);border-color:var(--verde);color:#fff}
+  .tab.activo small{color:#e5f4ea}
+  .tab.nuevo{border-style:dashed;color:var(--verde);font-weight:600}
+  /* Modales */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10;overflow-y:auto}
+  .modal .card{width:100%;max-width:420px;margin:auto}
+  .modal h2{font-size:1.3rem}
+  .modal p{color:var(--muted);margin:0 0 12px}
+  #formRegistro input{width:100%;margin-bottom:12px}
+  .campos{display:grid;grid-template-columns:1fr 1fr;gap:10px 10px;margin-bottom:14px}
+  .campos label{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--muted)}
+  .campos .todo{grid-column:1 / -1}
+  .campos input,.campos select{width:100%}
+  .botones{display:flex;gap:8px}
+  .botones button{flex:1}
+</style>
+</head>
+<body>
+<main>
+  <h1><img src="icon-192.png" alt="">Fútbol con amigos</h1>
+
+  <section class="card instalar" id="instalar" hidden>
+    <p id="instalarTexto">📲 Instalá la app en tu celular para tenerla a mano.</p>
+    <button type="button" id="btnInstalar">Instalar</button>
+    <button type="button" class="sec" id="cerrarInstalar" aria-label="Cerrar">✕</button>
+  </section>
+
+  <nav class="tabs" id="tabs" aria-label="Partidos"></nav>
+
+  <section class="card" id="sinPartidos" hidden>
+    <h2>Todavía no hay partidos</h2>
+    <p class="sub">Creá el primero: elegí el día, el horario y cuándo se abre la lista.</p>
+    <button class="ancho" type="button" id="crearPrimero">➕ Crear partido</button>
+  </section>
+
+  <div id="contenido" hidden>
+    <p class="sub" id="fecha"></p>
+
+    <section class="card">
+      <div class="estado" id="estado"></div>
+      <p class="hola" id="hola"></p>
+      <label class="check"><input type="checkbox" id="yoArquero"> 🧤 Juego sólo de arquero</label>
+      <button id="btn" class="ancho" type="button">Anotarme</button>
+
+      <details class="sub-amigo">
+        <summary>➕ Anotar a un amigo</summary>
+        <div class="amigo">
+          <input type="text" id="nombreAmigo" placeholder="Nombre del amigo" maxlength="30">
+          <button id="btnAmigo" type="button">Anotar</button>
+        </div>
+        <label class="check"><input type="checkbox" id="amigoArquero"> 🧤 Es sólo arquero</label>
+      </details>
+      <p class="msg" id="msg"></p>
+    </section>
+
+    <section class="card">
+      <h2>Titulares <span class="cupo" id="cupo"></span></h2>
+      <table>
+        <thead><tr><th></th><th>Jugador</th><th></th></tr></thead>
+        <tbody id="titulares"></tbody>
+      </table>
+    </section>
+
+    <section class="card" id="cardSuplentes" hidden>
+      <h2>Suplentes (lista de espera)</h2>
+      <table><tbody id="suplentes"></tbody></table>
+    </section>
+
+    <section class="card" id="cardEquipos" hidden>
+      <h2>Equipos sorteados</h2>
+      <div class="equipos">
+        <div><h3>⚪ Equipo 1</h3><ol id="eq1"></ol></div>
+        <div><h3>⚫ Equipo 2</h3><ol id="eq2"></ol></div>
+      </div>
+      <p class="aviso" id="avisoEquipos"></p>
+    </section>
+
+    <section class="card">
+      <details>
+        <summary>⚙️ Organización de este partido</summary>
+        <div class="fila">
+          <label>Abrir la lista ahora, sin esperar el horario</label>
+          <button id="toggleAbrir" class="sec" type="button"></button>
+        </div>
+        <div class="fila">
+          <label>Armar dos equipos al azar con los titulares (si hay 2 arqueros, va uno para cada lado)</label>
+          <button id="sortear" type="button">🎲 Sortear equipos</button>
+        </div>
+        <div class="fila">
+          <label>Día, horario, cupo, lugar…</label>
+          <button id="editar" class="sec" type="button">✏️ Editar</button>
+          <button id="eliminar" class="peligro" type="button">🗑️ Eliminar</button>
+        </div>
+      </details>
+    </section>
+  </div>
+
+  <p class="demo" id="demo" hidden>Modo demo: los datos se guardan sólo en este navegador. Completá la configuración de Firebase para compartirlo.</p>
+</main>
+
+<!-- ¿Quién sos? -->
+<div class="modal" id="registro" hidden>
+  <form class="card" id="formRegistro">
+    <h2>👋 ¿Quién sos?</h2>
+    <p>Escribí tu nombre tal como te conoce el grupo. Queda guardado en este dispositivo y <b>no se puede cambiar</b>.</p>
+    <input type="text" id="nombreRegistro" placeholder="Tu nombre" maxlength="30" autocomplete="name" required>
+    <button class="ancho" type="submit">Confirmar</button>
+    <p class="msg" id="msgRegistro"></p>
+  </form>
+</div>
+
+<!-- Crear / editar partido -->
+<div class="modal" id="modalPartido" hidden>
+  <form class="card" id="formPartido">
+    <h2 id="tituloPartido">Nuevo partido</h2>
+    <div class="campos">
+      <label class="todo">Nombre
+        <input type="text" id="pNombre" maxlength="40" placeholder="Ej: Fútbol 6 del martes" required>
+      </label>
+      <label class="todo">Lugar (opcional)
+        <input type="text" id="pLugar" maxlength="60" placeholder="Ej: Cancha La Bombonera">
+      </label>
+      <label>Día del partido <select id="pDia"></select></label>
+      <label>Hora <input type="time" id="pHora" required></label>
+      <label>La lista abre el <select id="pDiaApertura"></select></label>
+      <label>a las <input type="time" id="pHoraApertura" required></label>
+      <label class="todo">Cantidad de jugadores (titulares)
+        <input type="number" id="pCupo" min="2" max="30" step="1" required>
+      </label>
+    </div>
+    <div class="botones">
+      <button type="button" class="sec" id="cancelarPartido">Cancelar</button>
+      <button type="submit">Guardar</button>
+    </div>
+    <p class="msg" id="msgPartido"></p>
+  </form>
+</div>
+
+<script>
+// ---------- Instalar como app (PWA) ----------
+if ("serviceWorker" in navigator && location.protocol !== "file:")
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+
+const yaInstalada = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+const noMolestar = () => { try { return localStorage.getItem("futbol-sin-instalar") === "1"; } catch { return false; } };
+let pedidoInstalar = null;
+addEventListener("beforeinstallprompt", e => {   // Android / Chrome / Edge
+  e.preventDefault(); pedidoInstalar = e;
+  if (!noMolestar()) document.getElementById("instalar").hidden = false;
+});
+if (!yaInstalada && !noMolestar() && /iphone|ipad|ipod/i.test(navigator.userAgent)) { // iPhone: no hay botón, se explica
+  document.getElementById("instalarTexto").textContent = "📲 Para instalarla: tocá Compartir ⬆️ y después «Agregar a inicio».";
+  document.getElementById("btnInstalar").hidden = true;
+  document.getElementById("instalar").hidden = false;
+}
+document.getElementById("btnInstalar").onclick = async () => {
+  if (!pedidoInstalar) return;
+  pedidoInstalar.prompt(); await pedidoInstalar.userChoice;
+  pedidoInstalar = null; document.getElementById("instalar").hidden = true;
+};
+document.getElementById("cerrarInstalar").onclick = () => {
+  document.getElementById("instalar").hidden = true;
+  try { localStorage.setItem("futbol-sin-instalar", "1"); } catch {}
+};
+addEventListener("appinstalled", () => { document.getElementById("instalar").hidden = true; });
+
+</script>
+
+<script type="module">
+// ================== CONFIGURACIÓN ==================
+const CONFIG = {
+  maxSuplentes: 8,           // lista de espera de cada partido
+  duracionPartidoHoras: 2,   // terminado el partido, se pasa a la semana siguiente
+  listaSiempreAbierta: true, // PRUEBA: true = se puede anotar en cualquier momento. Ponelo en false para usar el horario
+  // Valores que aparecen precargados al crear un partido nuevo
+  nuevo: { dia: 2, hora: "19:00", diaApertura: 4, horaApertura: "10:00", cupo: 12 },
+};
+
+// Pegá acá la config de tu proyecto (Firebase console > Configuración del proyecto > Tus apps > Web)
+const firebaseConfig = {
+  apiKey: "AIzaSyD-XixSO4Comy-tSEGBnGf9iamrHSKck0g",
+  authDomain: "futbol5-9c28b.firebaseapp.com",
+  projectId: "futbol5-9c28b",
+  storageBucket: "futbol5-9c28b.firebasestorage.app",
+  messagingSenderId: "827371655048",
+  appId: "1:827371655048:web:7393e4a4d409e89a5f343d"
+};
+// ===================================================
+
+const DIAS = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
+const DIAS_CORTOS = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+const $ = id => document.getElementById(id);
+const hm = s => s.split(":").map(Number);
+const dos = n => String(n).padStart(2, "0");
+
+// p = un partido fijo: { id, nombre, lugar, dia, hora, diaApertura, horaApertura, cupo }
+function proximoPartido(p, ahora = new Date()) {
+  const [h, m] = hm(p.hora);
+  const d = new Date(ahora); d.setHours(h, m, 0, 0);
+  d.setDate(d.getDate() + (p.dia - d.getDay() + 7) % 7);
+  if (ahora - d > CONFIG.duracionPartidoHoras * 3600e3) d.setDate(d.getDate() + 7);
+  return d;
+}
+function aperturaDe(p, partido) {
+  const [h, m] = hm(p.horaApertura);
+  const a = new Date(partido); a.setHours(h, m, 0, 0);
+  let atras = (partido.getDay() - p.diaApertura + 7) % 7;
+  if (atras === 0 && a >= partido) atras = 7;
+  a.setDate(a.getDate() - atras);
+  return a;
+}
+const idFecha = d => `${d.getFullYear()}-${dos(d.getMonth()+1)}-${dos(d.getDate())}`;
+const fmt = d => `${DIAS[d.getDay()]} ${d.getDate()}/${d.getMonth()+1} a las ${dos(d.getHours())}:${dos(d.getMinutes())} hs`;
+const limpiar = s => s.trim().replace(/\s+/g, " ");
+const errorTexto = e => (e.code || e.message || "").includes("permission") ? "Sin permisos en Firebase (revisá las reglas)." : e.message;
+
+// ---------- Backend: Firebase o demo local ----------
+// Datos:
+//   usuarios/{uid}           -> { nombre }  (se crea una sola vez, no se puede modificar)
+//   partidos/{pid}           -> el partido fijo (nombre, día, hora, apertura, cupo, lugar)
+//   listas/{pid}_{fecha}     -> la lista de esa semana: { jugadores: [...], abiertaManual, equipos }
+const DEMO = firebaseConfig.apiKey === "TU_API_KEY";
+let backend;
+
+if (DEMO) {
+  const K = "futbol-demo-";
+  const uid = localStorage.getItem(K + "uid") || crypto.randomUUID();
+  localStorage.setItem(K + "uid", uid);
+  const oyentes = {};
+  const leer = (k, def) => JSON.parse(localStorage.getItem(K + k) || def);
+  const avisar = k => (oyentes[k] || []).forEach(cb => cb(leer(k, k === "partidos" ? "[]" : "{}")));
+  const escuchar = (k, def, cb) => {
+    (oyentes[k] ||= []).push(cb); cb(leer(k, def));
+    return () => { oyentes[k] = oyentes[k].filter(f => f !== cb); };
+  };
+  const escribir = (k, v) => { localStorage.setItem(K + k, JSON.stringify(v)); avisar(k); };
+  backend = {
+    uid: async () => uid,
+    perfil: async () => localStorage.getItem(K + "perfil"),
+    registrar: async nombre => {
+      if (localStorage.getItem(K + "perfil")) throw new Error("Ya estás registrado.");
+      localStorage.setItem(K + "perfil", nombre);
+    },
+    escucharPartidos: cb => escuchar("partidos", "[]", cb),
+    guardarPartido: async p => escribir("partidos", [...leer("partidos", "[]").filter(x => x.id !== p.id), p]),
+    borrarPartido: async id => escribir("partidos", leer("partidos", "[]").filter(x => x.id !== id)),
+    escuchar: (id, cb) => escuchar("lista-" + id, "{}", cb),
+    modificar: async (id, fn) => escribir("lista-" + id, fn(leer("lista-" + id, "{}"))),
+  };
+  addEventListener("storage", e => { if (e.key?.startsWith(K)) avisar(e.key.slice(K.length)); }); // otra pestaña
+  $("demo").hidden = false;
+} else {
+  try {
+    const V = "10.12.2";
+    const { initializeApp } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`);
+    const { getAuth, signInAnonymously, onAuthStateChanged } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-auth.js`);
+    const { getFirestore, doc, collection, getDoc, setDoc, deleteDoc, onSnapshot, runTransaction } =
+      await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app), db = getFirestore(app);
+    const uidListo = new Promise((ok, mal) => {
+      let primera = true;
+      onAuthStateChanged(auth, u => {
+        if (u) ok(u.uid);
+        else if (primera) signInAnonymously(auth).catch(mal);
+        primera = false;
+      });
+    });
+    const lista = id => doc(db, "listas", id);
+    backend = {
+      uid: () => uidListo,
+      perfil: async () => {
+        const s = await getDoc(doc(db, "usuarios", await uidListo));
+        return s.exists() ? s.data().nombre : null;
+      },
+      registrar: async nombre => setDoc(doc(db, "usuarios", await uidListo), { nombre }),
+      escucharPartidos: cb => onSnapshot(collection(db, "partidos"), s => cb(s.docs.map(d => ({ ...d.data(), id: d.id })))),
+      guardarPartido: ({ id, ...p }) => setDoc(doc(db, "partidos", id), p),
+      borrarPartido: id => deleteDoc(doc(db, "partidos", id)),
+      escuchar: (id, cb) => onSnapshot(lista(id), s => cb(s.exists() ? s.data() : {})),
+      modificar: (id, fn) => runTransaction(db, async tx => {
+        const s = await tx.get(lista(id));
+        tx.set(lista(id), { jugadores: [], ...fn(s.exists() ? s.data() : {}) });
+      }),
+    };
+  } catch (e) {
+    console.error(e); // sin internet o Firebase no cargó: se muestra el error más abajo
+  }
+}
+
+// ---------- Estado ----------
+let miUid = null, miNombre = null;
+let partidos = [];       // partidos fijos
+let actual = null;       // partido fijo seleccionado
+let fechaPartido, apertura, ID = null, datos = {}, dejarDeEscuchar = null;
+
+const jugadores = () => datos.jugadores || [];
+const cupo = () => actual?.cupo || CONFIG.nuevo.cupo;
+const abiertaManual = () => CONFIG.listaSiempreAbierta || !!datos.abiertaManual;
+const abierta = () => { const n = new Date(); return !!actual && (abiertaManual() || n >= apertura) && n < fechaPartido; };
+const yaEstoy = () => jugadores().some(j => j.uid === miUid && !j.amigoDe);
+const ordenados = () => [...partidos].sort((a, b) => proximoPartido(a) - proximoPartido(b));
+
+function seleccionar(pid) {
+  const p = partidos.find(x => x.id === pid) || ordenados()[0] || null;
+  const nuevaFecha = p && proximoPartido(p);
+  const nuevoID = p && `${p.id}_${idFecha(nuevaFecha)}`;
+  actual = p;
+  if (nuevoID !== ID) {             // cambió de partido o de semana: escuchar otra lista
+    dejarDeEscuchar?.(); dejarDeEscuchar = null;
+    ID = nuevoID; datos = {};
+    if (ID) {
+      const esteID = ID;
+      dejarDeEscuchar = backend.escuchar(ID, d => { if (ID === esteID) { datos = d || {}; pintarLista(); } });
+    }
+  }
+  if (p) {
+    fechaPartido = nuevaFecha;
+    apertura = aperturaDe(p, fechaPartido);
+    try { localStorage.setItem("futbol-partido", p.id); } catch {}
+    history.replaceState(null, "", "#" + p.id);
+  }
+  pintarTodo();
+}
+
+function cuentaRegresiva(ms) {
+  const s = Math.floor(ms / 1000), d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600),
+        m = Math.floor(s % 3600 / 60), seg = s % 60;
+  return (d ? d + "d " : "") + `${h}h ${dos(m)}m ${dos(seg)}s`;
+}
+
+// ---------- Pintar ----------
+function pintarTabs() {
+  const nav = $("tabs");
+  nav.replaceChildren();
+  for (const p of ordenados()) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "tab" + (p.id === actual?.id ? " activo" : "");
+    const t = document.createElement("b"); t.textContent = p.nombre;
+    const s = document.createElement("small");
+    const f = proximoPartido(p);
+    s.textContent = `${DIAS_CORTOS[p.dia]} ${f.getDate()}/${f.getMonth()+1} · ${p.hora} hs`;
+    b.append(t, s);
+    b.onclick = () => { $("msg").textContent = ""; seleccionar(p.id); };
+    nav.append(b);
+  }
+  const nuevo = document.createElement("button");
+  nuevo.type = "button"; nuevo.className = "tab nuevo"; nuevo.textContent = "➕ Nuevo";
+  nuevo.onclick = () => abrirFormulario(null);
+  nav.append(nuevo);
+  nav.querySelector(".activo")?.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
+function pintarTodo() {
+  pintarTabs();
+  $("sinPartidos").hidden = !!actual;
+  $("contenido").hidden = !actual;
+  if (!actual) return;
+  $("fecha").textContent = "📅 " + fmt(fechaPartido) + (actual.lugar ? " · 📍 " + actual.lugar : "");
+  pintarLista();
+}
+
+function pintarEstado() {
+  if (!actual) return;
+  const n = new Date(), est = $("estado");
+  if (n < apertura && !abiertaManual()) {
+    est.className = "estado cerrado";
+    est.textContent = `La lista abre el ${fmt(apertura)} · faltan ${cuentaRegresiva(apertura - n)}`;
+  } else if (n < fechaPartido) {
+    const lugares = cupo() - jugadores().length;
+    est.className = "estado abierto";
+    est.textContent = lugares > 0 ? `¡Lista abierta! Quedan ${lugares} lugares.` : "Titulares completos: los nuevos entran como suplentes.";
+  } else {
+    est.className = "estado cerrado";
+    est.textContent = "El partido ya empezó. La lista está cerrada.";
+  }
+  $("hola").replaceChildren();
+  if (miNombre) {
+    const b = document.createElement("b"); b.textContent = miNombre;
+    $("hola").append("Hola, ", b, yaEstoy() ? ". Ya estás anotado ✅" : ".");
+  }
+  $("yoArquero").parentElement.hidden = yaEstoy();
+  $("btn").disabled = !abierta() || !miNombre || yaEstoy();
+  $("btn").textContent = yaEstoy() ? "Ya estás anotado" : "Anotarme";
+  $("btnAmigo").disabled = !abierta() || !miNombre;
+  const t = $("toggleAbrir");
+  t.textContent = CONFIG.listaSiempreAbierta ? "Siempre abierta (CONFIG)" : datos.abiertaManual ? "Volver al horario" : "Abrir ahora";
+  t.disabled = CONFIG.listaSiempreAbierta;
+}
+
+function nombreConTags(j, conDetalle = true, editable = false) {
+  const frag = document.createDocumentFragment();
+  const span = document.createElement("span");
+  span.textContent = j.nombre;
+  frag.append(span);
+  if (editable) {
+    // Quien lo anotó puede cambiar la condición de arquero hasta que se sortee
+    const g = document.createElement("button");
+    g.type = "button";
+    g.className = "tag guante" + (j.arquero ? "" : " off");
+    g.textContent = j.arquero ? "🧤 arquero ✕" : "+ 🧤";
+    g.title = j.arquero ? "Dejar de ser arquero" : "Marcar como arquero";
+    g.onclick = () => cambiarArquero(j);
+    frag.append(g);
+  } else if (j.arquero) {
+    const g = document.createElement("span");
+    g.className = "tag guante"; g.textContent = "🧤 arquero";
+    frag.append(g);
+  }
+  if (j.amigoDe) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "tag"; b.textContent = "🤝"; b.title = "Amigo de " + j.amigoDe;
+    frag.append(b);
+    if (conDetalle) {
+      const det = document.createElement("span");
+      det.className = "detalle"; det.textContent = "Amigo de " + j.amigoDe; det.hidden = true;
+      b.onclick = () => { det.hidden = !det.hidden; };
+      frag.append(det);
+    } else {
+      b.onclick = () => alert("Amigo de " + j.amigoDe);
+    }
+  }
+  return frag;
+}
+
+function fila(j, i) {
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td class="n">${i + 1}</td><td></td><td class="x"></td>`;
+  if (!j) { tr.children[1].innerHTML = '<span class="vacio">—</span>'; return tr; }
+  const editable = j.uid === miUid && abierta() && !datos.equipos;
+  tr.children[1].append(nombreConTags(j, true, editable));
+  if (j.uid === miUid && !j.amigoDe) tr.children[1].firstChild.classList.add("yo");
+  if (j.uid === miUid && abierta()) {
+    const b = document.createElement("button");
+    b.className = "quitar"; b.title = "Bajar de la lista"; b.textContent = "✕";
+    b.onclick = () => {
+      if (!confirm(`¿Bajar a ${j.nombre} de la lista?`)) return;
+      accion(d => ({ ...d, jugadores: (d.jugadores || []).filter(x => !(x.id === j.id && x.uid === miUid)) }));
+    };
+    tr.children[2].append(b);
+  }
+  return tr;
+}
+
+function pintarLista() {
+  if (!actual) return;
+  const tit = $("titulares"), sup = $("suplentes"), l = jugadores(), c = cupo();
+  tit.replaceChildren(); sup.replaceChildren();
+  for (let i = 0; i < c; i++) tit.append(fila(l[i], i));
+  const resto = l.slice(c);
+  resto.forEach((j, i) => sup.append(fila(j, i)));
+  $("cardSuplentes").hidden = resto.length === 0;
+  $("cupo").textContent = `${Math.min(l.length, c)}/${c}`;
+  pintarEquipos();
+  pintarEstado();
+}
+
+function pintarEquipos() {
+  const eq = datos.equipos;
+  $("cardEquipos").hidden = !eq;
+  if (!eq) return;
+  const porId = Object.fromEntries(jugadores().map(j => [j.id, j]));
+  const li = j => { const e = document.createElement("li"); e.append(nombreConTags(porId[j.id] || j, false)); return e; };
+  $("eq1").replaceChildren(...eq.a.map(li));
+  $("eq2").replaceChildren(...eq.b.map(li));
+  const actuales = jugadores().slice(0, cupo()).map(j => j.id).sort().join("|");
+  const sorteados = [...eq.a, ...eq.b].map(j => j.id).sort().join("|");
+  $("avisoEquipos").textContent = actuales === sorteados ? "" : "⚠️ La lista de titulares cambió desde el sorteo. Volvé a sortear.";
+}
+
+// ---------- Acciones sobre la lista ----------
+async function accion(fn) {
+  $("msg").textContent = "";
+  if (!ID) return;
+  try { await backend.modificar(ID, fn); }
+  catch (err) { $("msg").textContent = errorTexto(err); }
+  pintarEstado();
+}
+
+function anotar(entrada) {
+  return accion(d => {
+    const l = d.jugadores || [];
+    if (l.some(j => j.nombre.toLowerCase() === entrada.nombre.toLowerCase()))
+      throw new Error(`"${entrada.nombre}" ya está anotado.`);
+    if (!entrada.amigoDe && l.some(j => j.uid === miUid && !j.amigoDe))
+      throw new Error("Ya estás anotado.");
+    if (l.length >= cupo() + CONFIG.maxSuplentes)
+      throw new Error("La lista está completa (titulares y suplentes).");
+    return { ...d, jugadores: [...l, entrada] };
+  });
+}
+
+function cambiarArquero(j) {
+  const quien = j.amigoDe ? j.nombre : "vos";
+  const pregunta = j.arquero ? `¿Sacar la condición de arquero a ${quien}?` : `¿Marcar a ${quien} como arquero?`;
+  if (!confirm(pregunta)) return;
+  accion(d => {
+    if (d.equipos) throw new Error("Los equipos ya se sortearon: no se puede cambiar el arquero.");
+    return { ...d, jugadores: (d.jugadores || []).map(x =>
+      x.id === j.id && x.uid === miUid ? { ...x, arquero: !x.arquero } : x) };
+  });
+}
+
+$("btn").onclick = async () => {
+  if (!abierta() || !miNombre) return;
+  $("btn").disabled = true;
+  await anotar({ id: crypto.randomUUID(), nombre: miNombre, uid: miUid, arquero: $("yoArquero").checked, ts: Date.now() });
+};
+
+$("btnAmigo").onclick = async () => {
+  const nombre = limpiar($("nombreAmigo").value);
+  if (!nombre) { $("msg").textContent = "Escribí el nombre de tu amigo."; return; }
+  if (!abierta() || !miNombre) return;
+  $("btnAmigo").disabled = true;
+  await anotar({ id: crypto.randomUUID(), nombre, uid: miUid, arquero: $("amigoArquero").checked, amigoDe: miNombre, ts: Date.now() });
+  if (!$("msg").textContent) { $("nombreAmigo").value = ""; $("amigoArquero").checked = false; }
+};
+
+$("toggleAbrir").onclick = () => accion(d => ({ ...d, abiertaManual: !d.abiertaManual }));
+
+function mezclar(arr) { // Fisher-Yates
+  for (let i = arr.length - 1; i > 0; i--) {
+    const k = crypto.getRandomValues(new Uint32Array(1))[0] % (i + 1);
+    [arr[i], arr[k]] = [arr[k], arr[i]];
+  }
+  return arr;
+}
+
+function sortearEquipos(titulares) {
+  const a = [], b = [];
+  // Arqueros primero, alternando: si hay 2, va uno a cada lado
+  mezclar(titulares.filter(j => j.arquero)).forEach((j, i) => (i % 2 ? b : a).push(j));
+  // El resto se reparte al equipo que tenga menos jugadores
+  for (const j of mezclar(titulares.filter(j => !j.arquero))) {
+    const destino = a.length < b.length ? a : b.length < a.length ? b : (Math.random() < .5 ? a : b);
+    destino.push(j);
+  }
+  const corto = j => ({ id: j.id, nombre: j.nombre, arquero: !!j.arquero, ...(j.amigoDe ? { amigoDe: j.amigoDe } : {}) });
+  return { a: a.map(corto), b: b.map(corto), ts: Date.now() };
+}
+
+$("sortear").onclick = () => {
+  const tit = jugadores().slice(0, cupo());
+  if (tit.length < 2) { $("msg").textContent = "Hacen falta al menos 2 anotados para sortear."; return; }
+  if (datos.equipos && !confirm("Ya hay equipos sorteados. ¿Sortear de nuevo?")) return;
+  accion(d => ({ ...d, equipos: sortearEquipos(tit) }));
+};
+
+// ---------- Crear / editar / eliminar partidos ----------
+let editando = null;
+for (const sel of [$("pDia"), $("pDiaApertura")])
+  [1, 2, 3, 4, 5, 6, 0].forEach(d => sel.add(new Option(DIAS[d][0].toUpperCase() + DIAS[d].slice(1), d)));
+
+function abrirFormulario(p) {
+  editando = p;
+  const v = p || { nombre: "", lugar: "", ...CONFIG.nuevo };
+  $("tituloPartido").textContent = p ? "Editar partido" : "Nuevo partido";
+  $("pNombre").value = v.nombre; $("pLugar").value = v.lugar || "";
+  $("pDia").value = v.dia; $("pHora").value = v.hora;
+  $("pDiaApertura").value = v.diaApertura; $("pHoraApertura").value = v.horaApertura;
+  $("pCupo").value = v.cupo;
+  $("msgPartido").textContent = "";
+  $("modalPartido").hidden = false;
+  $("pNombre").focus();
+}
+
+$("cancelarPartido").onclick = () => { $("modalPartido").hidden = true; };
+$("crearPrimero").onclick = () => abrirFormulario(null);
+$("editar").onclick = () => actual && abrirFormulario(actual);
+
+$("formPartido").onsubmit = async e => {
+  e.preventDefault();
+  const p = {
+    id: editando?.id || crypto.randomUUID().slice(0, 8),
+    nombre: limpiar($("pNombre").value),
+    lugar: limpiar($("pLugar").value),
+    dia: +$("pDia").value, hora: $("pHora").value,
+    diaApertura: +$("pDiaApertura").value, horaApertura: $("pHoraApertura").value,
+    cupo: parseInt($("pCupo").value, 10),
+  };
+  if (!p.nombre) { $("msgPartido").textContent = "Poné un nombre."; return; }
+  if (!(p.cupo >= 2 && p.cupo <= 30)) { $("msgPartido").textContent = "La cantidad tiene que estar entre 2 y 30."; return; }
+  try {
+    await backend.guardarPartido(p);
+    $("modalPartido").hidden = true;
+    seleccionar(p.id);
+  } catch (err) { $("msgPartido").textContent = errorTexto(err); }
+};
+
+$("eliminar").onclick = async () => {
+  if (!actual || !confirm(`¿Eliminar el partido "${actual.nombre}"? Desaparece para todos.`)) return;
+  try { await backend.borrarPartido(actual.id); }
+  catch (err) { $("msg").textContent = errorTexto(err); }
+};
+
+// ---------- Registro ("¿Quién sos?") ----------
+$("formRegistro").onsubmit = async e => {
+  e.preventDefault();
+  const nombre = limpiar($("nombreRegistro").value);
+  if (!nombre) return;
+  if (!confirm(`Vas a quedar registrado como "${nombre}". No se puede cambiar después. ¿Confirmás?`)) return;
+  try {
+    await backend.registrar(nombre);
+    miNombre = nombre;
+    $("registro").hidden = true;
+    pintarEstado();
+  } catch (err) { $("msgRegistro").textContent = errorTexto(err); }
+};
+
+// ---------- Arranque ----------
+try {
+  miUid = await backend.uid();
+  miNombre = await backend.perfil();
+  if (!miNombre) { $("registro").hidden = false; $("nombreRegistro").focus(); }
+  let primeraVez = true;
+  backend.escucharPartidos(lista => {
+    partidos = lista;
+    let preferido = actual?.id;
+    if (primeraVez) {
+      primeraVez = false;
+      let guardado = null; try { guardado = localStorage.getItem("futbol-partido"); } catch {}
+      preferido = location.hash.slice(1) || guardado;
+    }
+    seleccionar(preferido);
+  });
+} catch (e) {
+  $("sinPartidos").hidden = false;
+  $("crearPrimero").hidden = true;
+  $("sinPartidos").querySelector("h2").textContent = "No se pudo conectar";
+  $("sinPartidos").querySelector("p").textContent = backend
+    ? "Error conectando con Firebase: " + e.message
+    : "Revisá tu conexión a internet y volvé a abrir la app.";
+}
+
+addEventListener("hashchange", () => { const id = location.hash.slice(1); if (id && id !== actual?.id) seleccionar(id); });
+
+setInterval(() => {
+  if (!actual) return;
+  // Si el partido ya terminó, pasar solo a la semana siguiente
+  if (`${actual.id}_${idFecha(proximoPartido(actual))}` !== ID) return seleccionar(actual.id);
+  const antes = $("btn").dataset.abierta;
+  pintarEstado();
+  const ahora = String(abierta());
+  $("btn").dataset.abierta = ahora;
+  if (antes !== undefined && antes !== ahora) pintarLista(); // al abrir/cerrar, mostrar u ocultar los ✕
+}, 1000);
+</script>
+</body>
+</html>
