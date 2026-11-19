@@ -210,9 +210,11 @@
     <details>
       <summary>👤 Mi usuario</summary>
       <p id="miUsuarioTexto"></p>
-      <small>Código de usuario (sirve para designar al primer administrador desde Firebase):</small>
-      <code id="miCodigo"></code>
-      <button type="button" class="sec" id="copiarCodigo">📋 Copiar código</button>
+      <div id="bloqueCodigo" hidden>
+        <small>Código de usuario (sirve para buscarte en Firebase):</small>
+        <code id="miCodigo"></code>
+        <button type="button" class="sec" id="copiarCodigo">📋 Copiar código</button>
+      </div>
     </details>
   </section>
 
@@ -830,6 +832,9 @@ function pintarMiUsuario() {
     ? `Registrado como ${miNombre}${esDueno(miUid) ? " · 👑 dueño" : soyAdmin() ? " · 🔑 administrador" : ""}.`
     : "Todavía no te registraste.";
   $("miCodigo").textContent = miUid || "";
+  // El código completo sólo lo ven los administradores
+  // (o cualquiera si todavía no hay ningún admin, para poder crear el primero desde Firebase)
+  $("bloqueCodigo").hidden = !miUid || !(soyAdmin() || admins.length === 0);
 }
 $("copiarCodigo").onclick = async () => {
   try { await navigator.clipboard.writeText(miUid); $("copiarCodigo").textContent = "✅ Copiado"; }
