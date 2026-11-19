@@ -1,6 +1,6 @@
 // Service worker: permite instalar la app y abrirla aunque no haya señal.
 // Cambiá la versión cuando subas archivos nuevos para forzar la actualización.
-const VERSION = "futbol-v2";
+const VERSION = "futbol-v3";
 const ARCHIVOS = ["./", "./index.html", "./manifest.webmanifest", "./favicon.svg",
   "./icon-192.png", "./icon-512.png", "./icon-maskable.png", "./apple-touch-icon.png"];
 

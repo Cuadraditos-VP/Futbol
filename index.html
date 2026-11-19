@@ -73,6 +73,14 @@
   .equipos h3{margin:0;font-size:.95rem}
   .aviso{font-size:.85rem;color:var(--muted);margin:8px 0 0}
   .demo{font-size:.85rem;color:var(--muted);text-align:center}
+  .admin-badge{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:999px;font-size:.8rem;background:var(--verde-claro);color:var(--verde);font-weight:600}
+  .lista-admins{list-style:none;margin:8px 0 0;padding:0}
+  .lista-admins li{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+  .lista-admins small,.codigo small{color:var(--muted)}
+  .fila select{flex:1;min-width:150px}
+  .codigo{font-size:.9rem}
+  .codigo code{display:block;margin:6px 0 8px;padding:8px;border-radius:8px;background:var(--bg);border:1px solid var(--line);word-break:break-all;font-size:.85rem}
+  h2.admin-titulo{margin:0}
   /* Selector de partidos */
   .tabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:12px;scrollbar-width:thin}
   .tab{flex:0 0 auto;background:var(--card);color:var(--txt);border:1px solid var(--line);padding:8px 12px;border-radius:12px;text-align:left;font-weight:400;line-height:1.25}
@@ -109,7 +117,7 @@
 
   <section class="card" id="sinPartidos" hidden>
     <h2>Todavía no hay partidos</h2>
-    <p class="sub">Creá el primero: elegí el día, el horario y cuándo se abre la lista.</p>
+    <p class="sub" id="sinPartidosTexto">Un administrador tiene que crear el primero.</p>
     <button class="ancho" type="button" id="crearPrimero">➕ Crear partido</button>
   </section>
 
@@ -155,9 +163,9 @@
       <p class="aviso" id="avisoEquipos"></p>
     </section>
 
-    <section class="card">
+    <section class="card" id="cardAdminPartido" hidden>
       <details>
-        <summary>⚙️ Organización de este partido</summary>
+        <summary>🔑 Administración de este partido</summary>
         <div class="fila">
           <label>Abrir la lista ahora, sin esperar el horario</label>
           <button id="toggleAbrir" class="sec" type="button"></button>
@@ -174,6 +182,29 @@
       </details>
     </section>
   </div>
+
+  <section class="card" id="cardAdmins" hidden>
+    <details>
+      <summary>🔑 Administradores</summary>
+      <ul class="lista-admins" id="listaAdmins"></ul>
+      <div class="fila">
+        <select id="selNuevoAdmin" aria-label="Usuario a designar"></select>
+        <button id="btnNuevoAdmin" type="button">Designar</button>
+      </div>
+      <p class="aviso">Sólo aparecen los usuarios que ya se registraron en la app. Un administrador puede crear, editar y borrar partidos, decidir cuándo abre la lista, sortear equipos y bajar a cualquiera.</p>
+      <p class="msg" id="msgAdmins"></p>
+    </details>
+  </section>
+
+  <section class="card codigo">
+    <details>
+      <summary>👤 Mi usuario</summary>
+      <p id="miUsuarioTexto"></p>
+      <small>Código de usuario (sirve para designar al primer administrador desde Firebase):</small>
+      <code id="miCodigo"></code>
+      <button type="button" class="sec" id="copiarCodigo">📋 Copiar código</button>
+    </details>
+  </section>
 
   <p class="demo" id="demo" hidden>Modo demo: los datos se guardan sólo en este navegador. Completá la configuración de Firebase para compartirlo.</p>
 </main>
@@ -251,7 +282,6 @@ addEventListener("appinstalled", () => { document.getElementById("instalar").hid
 const CONFIG = {
   maxSuplentes: 8,           // lista de espera de cada partido
   duracionPartidoHoras: 2,   // terminado el partido, se pasa a la semana siguiente
-  listaSiempreAbierta: true, // PRUEBA: true = se puede anotar en cualquier momento. Ponelo en false para usar el horario
   // Valores que aparecen precargados al crear un partido nuevo
   nuevo: { dia: 2, hora: "19:00", diaApertura: 4, horaApertura: "10:00", cupo: 12 },
 };
@@ -296,7 +326,8 @@ const errorTexto = e => (e.code || e.message || "").includes("permission") ? "Si
 
 // ---------- Backend: Firebase o demo local ----------
 // Datos:
-//   usuarios/{uid}           -> { nombre }  (se crea una sola vez, no se puede modificar)
+//   usuarios/{uid}           -> { nombre, creado }  (se crea una sola vez, no se puede modificar)
+//   admins/{uid}             -> { nombre }  (sólo un administrador puede agregar o quitar)
 //   partidos/{pid}           -> el partido fijo (nombre, día, hora, apertura, cupo, lugar)
 //   listas/{pid}_{fecha}     -> la lista de esa semana: { jugadores: [...], abiertaManual, equipos }
 const DEMO = firebaseConfig.apiKey === "TU_API_KEY";
@@ -308,7 +339,8 @@ if (DEMO) {
   localStorage.setItem(K + "uid", uid);
   const oyentes = {};
   const leer = (k, def) => JSON.parse(localStorage.getItem(K + k) || def);
-  const avisar = k => (oyentes[k] || []).forEach(cb => cb(leer(k, k === "partidos" ? "[]" : "{}")));
+  const vacio = k => (k === "partidos" || k === "admins" || k === "usuarios") ? "[]" : "{}";
+  const avisar = k => (oyentes[k] || []).forEach(cb => cb(leer(k, vacio(k))));
   const escuchar = (k, def, cb) => {
     (oyentes[k] ||= []).push(cb); cb(leer(k, def));
     return () => { oyentes[k] = oyentes[k].filter(f => f !== cb); };
@@ -320,7 +352,14 @@ if (DEMO) {
     registrar: async nombre => {
       if (localStorage.getItem(K + "perfil")) throw new Error("Ya estás registrado.");
       localStorage.setItem(K + "perfil", nombre);
+      escribir("usuarios", [...leer("usuarios", "[]"), { uid, nombre, creado: Date.now() }]);
+      // En modo demo, el primero que se registra queda como administrador
+      if (!leer("admins", "[]").length) escribir("admins", [{ uid, nombre }]);
     },
+    escucharAdmins: cb => escuchar("admins", "[]", cb),
+    listarUsuarios: async () => leer("usuarios", "[]"),
+    agregarAdmin: async (u, nombre) => escribir("admins", [...leer("admins", "[]").filter(a => a.uid !== u), { uid: u, nombre }]),
+    quitarAdmin: async u => escribir("admins", leer("admins", "[]").filter(a => a.uid !== u)),
     escucharPartidos: cb => escuchar("partidos", "[]", cb),
     guardarPartido: async p => escribir("partidos", [...leer("partidos", "[]").filter(x => x.id !== p.id), p]),
     borrarPartido: async id => escribir("partidos", leer("partidos", "[]").filter(x => x.id !== id)),
@@ -334,7 +373,7 @@ if (DEMO) {
     const V = "10.12.2";
     const { initializeApp } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`);
     const { getAuth, signInAnonymously, onAuthStateChanged } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-auth.js`);
-    const { getFirestore, doc, collection, getDoc, setDoc, deleteDoc, onSnapshot, runTransaction } =
+    const { getFirestore, doc, collection, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, runTransaction } =
       await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app), db = getFirestore(app);
@@ -353,7 +392,11 @@ if (DEMO) {
         const s = await getDoc(doc(db, "usuarios", await uidListo));
         return s.exists() ? s.data().nombre : null;
       },
-      registrar: async nombre => setDoc(doc(db, "usuarios", await uidListo), { nombre }),
+      registrar: async nombre => setDoc(doc(db, "usuarios", await uidListo), { nombre, creado: Date.now() }),
+      escucharAdmins: cb => onSnapshot(collection(db, "admins"), s => cb(s.docs.map(d => ({ ...d.data(), uid: d.id })))),
+      listarUsuarios: async () => (await getDocs(collection(db, "usuarios"))).docs.map(d => ({ ...d.data(), uid: d.id })),
+      agregarAdmin: (u, nombre) => setDoc(doc(db, "admins", u), { nombre }),
+      quitarAdmin: u => deleteDoc(doc(db, "admins", u)),
       escucharPartidos: cb => onSnapshot(collection(db, "partidos"), s => cb(s.docs.map(d => ({ ...d.data(), id: d.id })))),
       guardarPartido: ({ id, ...p }) => setDoc(doc(db, "partidos", id), p),
       borrarPartido: id => deleteDoc(doc(db, "partidos", id)),
@@ -369,14 +412,15 @@ if (DEMO) {
 }
 
 // ---------- Estado ----------
-let miUid = null, miNombre = null;
-let partidos = [];       // partidos fijos
+let miUid = null, miNombre = null, admins = [];
+const soyAdmin = () => admins.some(a => a.uid === miUid);
+let partidos = [], partidosCargados = false; // partidos fijos
 let actual = null;       // partido fijo seleccionado
 let fechaPartido, apertura, ID = null, datos = {}, dejarDeEscuchar = null;
 
 const jugadores = () => datos.jugadores || [];
 const cupo = () => actual?.cupo || CONFIG.nuevo.cupo;
-const abiertaManual = () => CONFIG.listaSiempreAbierta || !!datos.abiertaManual;
+const abiertaManual = () => !!datos.abiertaManual;
 const abierta = () => { const n = new Date(); return !!actual && (abiertaManual() || n >= apertura) && n < fechaPartido; };
 const yaEstoy = () => jugadores().some(j => j.uid === miUid && !j.amigoDe);
 const ordenados = () => [...partidos].sort((a, b) => proximoPartido(a) - proximoPartido(b));
@@ -425,17 +469,25 @@ function pintarTabs() {
     b.onclick = () => { $("msg").textContent = ""; seleccionar(p.id); };
     nav.append(b);
   }
-  const nuevo = document.createElement("button");
-  nuevo.type = "button"; nuevo.className = "tab nuevo"; nuevo.textContent = "➕ Nuevo";
-  nuevo.onclick = () => abrirFormulario(null);
-  nav.append(nuevo);
+  if (soyAdmin()) {
+    const nuevo = document.createElement("button");
+    nuevo.type = "button"; nuevo.className = "tab nuevo"; nuevo.textContent = "➕ Nuevo";
+    nuevo.onclick = () => abrirFormulario(null);
+    nav.append(nuevo);
+  }
   nav.querySelector(".activo")?.scrollIntoView({ block: "nearest", inline: "nearest" });
 }
 
 function pintarTodo() {
   pintarTabs();
-  $("sinPartidos").hidden = !!actual;
+  $("sinPartidos").hidden = !!actual || !partidosCargados;
   $("contenido").hidden = !actual;
+  $("crearPrimero").hidden = !soyAdmin();
+  $("sinPartidosTexto").textContent = soyAdmin()
+    ? "Creá el primero: elegí el día, el horario y cuándo se abre la lista."
+    : "Un administrador tiene que crear el primero.";
+  $("cardAdminPartido").hidden = !soyAdmin();
+  $("cardAdmins").hidden = !soyAdmin();
   if (!actual) return;
   $("fecha").textContent = "📅 " + fmt(fechaPartido) + (actual.lugar ? " · 📍 " + actual.lugar : "");
   pintarLista();
@@ -459,14 +511,17 @@ function pintarEstado() {
   if (miNombre) {
     const b = document.createElement("b"); b.textContent = miNombre;
     $("hola").append("Hola, ", b, yaEstoy() ? ". Ya estás anotado ✅" : ".");
+    if (soyAdmin()) {
+      const a = document.createElement("span"); a.className = "admin-badge"; a.textContent = "🔑 Admin";
+      $("hola").append(a);
+    }
   }
   $("yoArquero").parentElement.hidden = yaEstoy();
   $("btn").disabled = !abierta() || !miNombre || yaEstoy();
   $("btn").textContent = yaEstoy() ? "Ya estás anotado" : "Anotarme";
   $("btnAmigo").disabled = !abierta() || !miNombre;
   const t = $("toggleAbrir");
-  t.textContent = CONFIG.listaSiempreAbierta ? "Siempre abierta (CONFIG)" : datos.abiertaManual ? "Volver al horario" : "Abrir ahora";
-  t.disabled = CONFIG.listaSiempreAbierta;
+  t.textContent = datos.abiertaManual ? "Volver al horario" : "Abrir ahora";
 }
 
 function nombreConTags(j, conDetalle = true, editable = false) {
@@ -511,12 +566,14 @@ function fila(j, i) {
   const editable = j.uid === miUid && abierta() && !datos.equipos;
   tr.children[1].append(nombreConTags(j, true, editable));
   if (j.uid === miUid && !j.amigoDe) tr.children[1].firstChild.classList.add("yo");
-  if (j.uid === miUid && abierta()) {
+  // Cada uno baja lo que anotó (con la lista abierta); un administrador puede bajar a cualquiera
+  if ((j.uid === miUid && abierta()) || soyAdmin()) {
     const b = document.createElement("button");
     b.className = "quitar"; b.title = "Bajar de la lista"; b.textContent = "✕";
     b.onclick = () => {
-      if (!confirm(`¿Bajar a ${j.nombre} de la lista?`)) return;
-      accion(d => ({ ...d, jugadores: (d.jugadores || []).filter(x => !(x.id === j.id && x.uid === miUid)) }));
+      const ajeno = j.uid !== miUid;
+      if (!confirm(ajeno ? `Como administrador, ¿bajar a ${j.nombre} de la lista?` : `¿Bajar a ${j.nombre} de la lista?`)) return;
+      accion(d => ({ ...d, jugadores: (d.jugadores || []).filter(x => !(x.id === j.id && (x.uid === miUid || soyAdmin()))) }));
     };
     tr.children[2].append(b);
   }
@@ -597,7 +654,7 @@ $("btnAmigo").onclick = async () => {
   if (!$("msg").textContent) { $("nombreAmigo").value = ""; $("amigoArquero").checked = false; }
 };
 
-$("toggleAbrir").onclick = () => accion(d => ({ ...d, abiertaManual: !d.abiertaManual }));
+$("toggleAbrir").onclick = () => soyAdmin() && accion(d => ({ ...d, abiertaManual: !d.abiertaManual }));
 
 function mezclar(arr) { // Fisher-Yates
   for (let i = arr.length - 1; i > 0; i--) {
@@ -621,6 +678,7 @@ function sortearEquipos(titulares) {
 }
 
 $("sortear").onclick = () => {
+  if (!soyAdmin()) return;
   const tit = jugadores().slice(0, cupo());
   if (tit.length < 2) { $("msg").textContent = "Hacen falta al menos 2 anotados para sortear."; return; }
   if (datos.equipos && !confirm("Ya hay equipos sorteados. ¿Sortear de nuevo?")) return;
@@ -646,11 +704,12 @@ function abrirFormulario(p) {
 }
 
 $("cancelarPartido").onclick = () => { $("modalPartido").hidden = true; };
-$("crearPrimero").onclick = () => abrirFormulario(null);
-$("editar").onclick = () => actual && abrirFormulario(actual);
+$("crearPrimero").onclick = () => soyAdmin() && abrirFormulario(null);
+$("editar").onclick = () => soyAdmin() && actual && abrirFormulario(actual);
 
 $("formPartido").onsubmit = async e => {
   e.preventDefault();
+  if (!soyAdmin()) { $("msgPartido").textContent = "Sólo un administrador puede crear o editar partidos."; return; }
   const p = {
     id: editando?.id || crypto.randomUUID().slice(0, 8),
     nombre: limpiar($("pNombre").value),
@@ -669,9 +728,74 @@ $("formPartido").onsubmit = async e => {
 };
 
 $("eliminar").onclick = async () => {
-  if (!actual || !confirm(`¿Eliminar el partido "${actual.nombre}"? Desaparece para todos.`)) return;
+  if (!actual || !soyAdmin() || !confirm(`¿Eliminar el partido "${actual.nombre}"? Desaparece para todos.`)) return;
   try { await backend.borrarPartido(actual.id); }
   catch (err) { $("msg").textContent = errorTexto(err); }
+};
+
+// ---------- Administradores ----------
+const codigoCorto = u => "…" + u.slice(-5);
+
+function pintarAdmins() {
+  const ul = $("listaAdmins");
+  ul.replaceChildren();
+  for (const a of [...admins].sort((x, y) => (x.nombre || "").localeCompare(y.nombre || ""))) {
+    const li = document.createElement("li");
+    const t = document.createElement("span");
+    t.textContent = (a.nombre || "(sin nombre)") + " ";
+    const c = document.createElement("small"); c.textContent = codigoCorto(a.uid) + (a.uid === miUid ? " · vos" : "");
+    t.append(c);
+    li.append(t);
+    if (a.uid !== miUid) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "quitar"; b.title = "Quitar administrador"; b.textContent = "✕";
+      b.onclick = async () => {
+        if (!confirm(`¿Quitarle el rol de administrador a ${a.nombre}?`)) return;
+        try { await backend.quitarAdmin(a.uid); } catch (err) { $("msgAdmins").textContent = errorTexto(err); }
+      };
+      li.append(b);
+    }
+    ul.append(li);
+  }
+}
+
+async function cargarUsuarios() {
+  const sel = $("selNuevoAdmin");
+  sel.replaceChildren(new Option("Elegí un usuario…", ""));
+  try {
+    const esAdmin = new Set(admins.map(a => a.uid));
+    const usuarios = (await backend.listarUsuarios())
+      .filter(u => !esAdmin.has(u.uid))
+      .sort((x, y) => (x.nombre || "").localeCompare(y.nombre || ""));
+    for (const u of usuarios) {
+      const fecha = u.creado ? " · desde " + new Date(u.creado).toLocaleDateString("es-AR") : "";
+      sel.add(new Option(`${u.nombre} (${codigoCorto(u.uid)}${fecha})`, u.uid));
+    }
+    if (!usuarios.length) sel.replaceChildren(new Option("No hay otros usuarios registrados", ""));
+  } catch (err) { $("msgAdmins").textContent = errorTexto(err); }
+}
+$("cardAdmins").querySelector("details").addEventListener("toggle", e => { if (e.target.open) cargarUsuarios(); });
+
+$("btnNuevoAdmin").onclick = async () => {
+  const sel = $("selNuevoAdmin"), u = sel.value;
+  $("msgAdmins").textContent = "";
+  if (!u || !soyAdmin()) return;
+  const nombre = sel.selectedOptions[0].text.replace(/ \(….*$/, "");
+  if (!confirm(`¿Designar a ${nombre} como administrador?`)) return;
+  try { await backend.agregarAdmin(u, nombre); await cargarUsuarios(); }
+  catch (err) { $("msgAdmins").textContent = errorTexto(err); }
+};
+
+function pintarMiUsuario() {
+  $("miUsuarioTexto").textContent = miNombre
+    ? `Registrado como ${miNombre}${soyAdmin() ? " · 🔑 administrador" : ""}.`
+    : "Todavía no te registraste.";
+  $("miCodigo").textContent = miUid || "";
+}
+$("copiarCodigo").onclick = async () => {
+  try { await navigator.clipboard.writeText(miUid); $("copiarCodigo").textContent = "✅ Copiado"; }
+  catch { getSelection().selectAllChildren($("miCodigo")); $("copiarCodigo").textContent = "Copialo a mano"; }
+  setTimeout(() => { $("copiarCodigo").textContent = "📋 Copiar código"; }, 2000);
 };
 
 // ---------- Registro ("¿Quién sos?") ----------
@@ -685,6 +809,7 @@ $("formRegistro").onsubmit = async e => {
     miNombre = nombre;
     $("registro").hidden = true;
     pintarEstado();
+    pintarMiUsuario();
   } catch (err) { $("msgRegistro").textContent = errorTexto(err); }
 };
 
@@ -693,9 +818,16 @@ try {
   miUid = await backend.uid();
   miNombre = await backend.perfil();
   if (!miNombre) { $("registro").hidden = false; $("nombreRegistro").focus(); }
+  pintarMiUsuario();
+  backend.escucharAdmins(lista => {
+    admins = lista;
+    pintarAdmins();
+    pintarMiUsuario();
+    pintarTodo();
+  });
   let primeraVez = true;
   backend.escucharPartidos(lista => {
-    partidos = lista;
+    partidos = lista; partidosCargados = true;
     let preferido = actual?.id;
     if (primeraVez) {
       primeraVez = false;

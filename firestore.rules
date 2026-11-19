@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function logueado() { return request.auth != null; }
+    function esAdmin() {
+      return logueado() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Perfil de cada usuario: se crea UNA vez y no se puede cambiar ni borrar
+    match /usuarios/{uid} {
+      allow read: if true;
+      allow create: if logueado()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['nombre', 'creado'])
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() > 0
+        && request.resource.data.nombre.size() <= 30;
+      allow update, delete: if false;
+    }
+
+    // Administradores: sólo un administrador agrega o quita a otro (nadie se puede quitar a sí mismo).
+    // El PRIMER administrador se crea a mano desde la consola de Firebase.
+    match /admins/{uid} {
+      allow read: if true;
+      allow create: if esAdmin()
+        && request.resource.data.keys().hasOnly(['nombre'])
+        && request.resource.data.nombre is string;
+      allow delete: if esAdmin() && uid != request.auth.uid;
+      allow update: if false;
+    }
+
+    // Partidos fijos (día, hora, apertura, cupo, lugar): SÓLO administradores
+    match /partidos/{pid} {
+      allow read: if true;
+      allow create, update: if esAdmin()
+        && request.resource.data.keys().hasOnly(['nombre', 'lugar', 'dia', 'hora', 'diaApertura', 'horaApertura', 'cupo'])
+        && request.resource.data.nombre is string && request.resource.data.nombre.size() <= 40
+        && request.resource.data.dia is int && request.resource.data.dia >= 0 && request.resource.data.dia <= 6
+        && request.resource.data.diaApertura is int && request.resource.data.diaApertura >= 0 && request.resource.data.diaApertura <= 6
+        && request.resource.data.cupo is int && request.resource.data.cupo >= 2 && request.resource.data.cupo <= 30;
+      allow delete: if esAdmin();
+    }
+
+    // Lista semanal de cada partido: listas/{pid}_{fecha}
+    // Cualquiera se anota; sólo un administrador abre la lista antes de hora o sortea equipos.
+    match /listas/{id} {
+      function listaValida() {
+        return request.resource.data.keys().hasOnly(['jugadores', 'abiertaManual', 'equipos'])
+          && request.resource.data.jugadores is list
+          && request.resource.data.jugadores.size() <= 60;
+      }
+      allow read: if true;
+      allow create: if logueado() && listaValida()
+        && (esAdmin() || (!('abiertaManual' in request.resource.data) && !('equipos' in request.resource.data)));
+      allow update: if logueado() && listaValida()
+        && (esAdmin() || (
+             request.resource.data.get('abiertaManual', false) == resource.data.get('abiertaManual', false)
+          && request.resource.data.get('equipos', null) == resource.data.get('equipos', null)));
+      allow delete: if false;
+    }
+  }
+}
