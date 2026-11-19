@@ -27,7 +27,8 @@ service cloud.firestore {
       allow create: if esAdmin()
         && request.resource.data.keys().hasOnly(['nombre'])
         && request.resource.data.nombre is string;
-      allow delete: if esAdmin() && uid != request.auth.uid;
+      // Nadie se quita a sí mismo, y al DUEÑO (campo dueno: true, se marca a mano en la consola) no lo quita nadie
+      allow delete: if esAdmin() && uid != request.auth.uid && resource.data.get('dueno', false) != true;
       allow update: if false;
     }
 

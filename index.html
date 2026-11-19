@@ -364,7 +364,7 @@ if (DEMO) {
       localStorage.setItem(K + "perfil", nombre);
       escribir("usuarios", [...leer("usuarios", "[]"), { uid, nombre, creado: Date.now() }]);
       // En modo demo, el primero que se registra queda como administrador
-      if (!leer("admins", "[]").length) escribir("admins", [{ uid, nombre }]);
+      if (!leer("admins", "[]").length) escribir("admins", [{ uid, nombre, dueno: true }]);
     },
     escucharAdmins: cb => escuchar("admins", "[]", cb),
     escucharUsuarios: cb => escuchar("usuarios", "[]", cb),
@@ -425,6 +425,7 @@ if (DEMO) {
 // ---------- Estado ----------
 let miUid = null, miNombre = null, admins = [];
 const soyAdmin = () => admins.some(a => a.uid === miUid);
+const esDueno = uid => admins.some(a => a.uid === uid && a.dueno === true);
 let partidos = [], partidosCargados = false; // partidos fijos
 let actual = null;       // partido fijo seleccionado
 let fechaPartido, apertura, ID = null, datos = {}, dejarDeEscuchar = null;
@@ -524,7 +525,7 @@ function pintarEstado() {
     const b = document.createElement("b"); b.textContent = miNombre;
     $("hola").append("Hola, ", b, yaEstoy() ? ". Ya estás anotado ✅" : ".");
     if (soyAdmin()) {
-      const a = document.createElement("span"); a.className = "admin-badge"; a.textContent = "🔑 Admin";
+      const a = document.createElement("span"); a.className = "admin-badge"; a.textContent = esDueno(miUid) ? "👑 Dueño" : "🔑 Admin";
       $("hola").append(a);
     }
   }
@@ -755,10 +756,11 @@ function pintarAdmins() {
     const li = document.createElement("li");
     const t = document.createElement("span");
     t.textContent = (a.nombre || "(sin nombre)") + " ";
-    const c = document.createElement("small"); c.textContent = codigoCorto(a.uid) + (a.uid === miUid ? " · vos" : "");
+    if (a.dueno === true) t.append("👑 ");
+    const c = document.createElement("small"); c.textContent = codigoCorto(a.uid) + (a.dueno === true ? " · dueño" : "") + (a.uid === miUid ? " · vos" : "");
     t.append(c);
     li.append(t);
-    if (a.uid !== miUid) {
+    if (a.uid !== miUid && a.dueno !== true) {   // al dueño no lo puede quitar nadie
       const b = document.createElement("button");
       b.type = "button"; b.className = "quitar"; b.title = "Quitar administrador"; b.textContent = "✕";
       b.onclick = async () => {
@@ -798,7 +800,7 @@ function pintarUsuarios() {
     const li = document.createElement("li");
     const info = document.createElement("span"); info.className = "info";
     const n = document.createElement("b");
-    n.textContent = (u.nombre || "(sin nombre)") + (esAdmin.has(u.uid) ? " 🔑" : "") + (u.uid === miUid ? " (vos)" : "");
+    n.textContent = (u.nombre || "(sin nombre)") + (esDueno(u.uid) ? " 👑" : esAdmin.has(u.uid) ? " 🔑" : "") + (u.uid === miUid ? " (vos)" : "");
     const d = document.createElement("small");
     d.textContent = (u.creado ? "Desde " + fechaCorta(u.creado) + " · " : "") + "código " + codigoCorto(u.uid);
     info.append(n, d);
@@ -825,7 +827,7 @@ $("buscarUsuario").addEventListener("input", pintarUsuarios);
 
 function pintarMiUsuario() {
   $("miUsuarioTexto").textContent = miNombre
-    ? `Registrado como ${miNombre}${soyAdmin() ? " · 🔑 administrador" : ""}.`
+    ? `Registrado como ${miNombre}${esDueno(miUid) ? " · 👑 dueño" : soyAdmin() ? " · 🔑 administrador" : ""}.`
     : "Todavía no te registraste.";
   $("miCodigo").textContent = miUid || "";
 }
