@@ -8,8 +8,9 @@ service cloud.firestore {
     }
 
     // Perfil de cada usuario: se crea UNA vez y no se puede cambiar ni borrar
+    // La lista completa sólo la ven los administradores; cada uno puede ver su propio perfil
     match /usuarios/{uid} {
-      allow read: if true;
+      allow read: if esAdmin() || (logueado() && request.auth.uid == uid);
       allow create: if logueado()
         && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(['nombre', 'creado'])

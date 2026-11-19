@@ -81,6 +81,10 @@
   .codigo{font-size:.9rem}
   .codigo code{display:block;margin:6px 0 8px;padding:8px;border-radius:8px;background:var(--bg);border:1px solid var(--line);word-break:break-all;font-size:.85rem}
   h2.admin-titulo{margin:0}
+  .usuarios-buscar{width:100%;margin-top:10px}
+  .lista-admins .info{display:flex;flex-direction:column;min-width:0}
+  .lista-admins .info b{overflow:hidden;text-overflow:ellipsis}
+  .mini{padding:6px 10px;font-size:.85rem;flex:0 0 auto}
   /* Selector de partidos */
   .tabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:12px;scrollbar-width:thin}
   .tab{flex:0 0 auto;background:var(--card);color:var(--txt);border:1px solid var(--line);padding:8px 12px;border-radius:12px;text-align:left;font-weight:400;line-height:1.25}
@@ -183,15 +187,21 @@
     </section>
   </div>
 
+  <section class="card" id="cardUsuarios" hidden>
+    <details>
+      <summary>👥 Usuarios registrados <span class="cupo" id="cantUsuarios"></span></summary>
+      <input type="text" class="usuarios-buscar" id="buscarUsuario" placeholder="🔍 Buscar por nombre…" aria-label="Buscar usuario">
+      <ul class="lista-admins" id="listaUsuarios"></ul>
+      <p class="aviso">Cada celular o compu cuenta como un usuario distinto. Con <b>🔑 Designar</b> lo hacés administrador.</p>
+      <p class="msg" id="msgUsuarios"></p>
+    </details>
+  </section>
+
   <section class="card" id="cardAdmins" hidden>
     <details>
       <summary>🔑 Administradores</summary>
       <ul class="lista-admins" id="listaAdmins"></ul>
-      <div class="fila">
-        <select id="selNuevoAdmin" aria-label="Usuario a designar"></select>
-        <button id="btnNuevoAdmin" type="button">Designar</button>
-      </div>
-      <p class="aviso">Sólo aparecen los usuarios que ya se registraron en la app. Un administrador puede crear, editar y borrar partidos, decidir cuándo abre la lista, sortear equipos y bajar a cualquiera.</p>
+      <p class="aviso">Para designar a alguien, buscalo en <b>👥 Usuarios registrados</b>. Un administrador puede crear, editar y borrar partidos, decidir cuándo abre la lista, sortear equipos y bajar a cualquiera.</p>
       <p class="msg" id="msgAdmins"></p>
     </details>
   </section>
@@ -357,7 +367,7 @@ if (DEMO) {
       if (!leer("admins", "[]").length) escribir("admins", [{ uid, nombre }]);
     },
     escucharAdmins: cb => escuchar("admins", "[]", cb),
-    listarUsuarios: async () => leer("usuarios", "[]"),
+    escucharUsuarios: cb => escuchar("usuarios", "[]", cb),
     agregarAdmin: async (u, nombre) => escribir("admins", [...leer("admins", "[]").filter(a => a.uid !== u), { uid: u, nombre }]),
     quitarAdmin: async u => escribir("admins", leer("admins", "[]").filter(a => a.uid !== u)),
     escucharPartidos: cb => escuchar("partidos", "[]", cb),
@@ -373,7 +383,7 @@ if (DEMO) {
     const V = "10.12.2";
     const { initializeApp } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`);
     const { getAuth, signInAnonymously, onAuthStateChanged } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-auth.js`);
-    const { getFirestore, doc, collection, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, runTransaction } =
+    const { getFirestore, doc, collection, getDoc, setDoc, deleteDoc, onSnapshot, runTransaction } =
       await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app), db = getFirestore(app);
@@ -394,7 +404,8 @@ if (DEMO) {
       },
       registrar: async nombre => setDoc(doc(db, "usuarios", await uidListo), { nombre, creado: Date.now() }),
       escucharAdmins: cb => onSnapshot(collection(db, "admins"), s => cb(s.docs.map(d => ({ ...d.data(), uid: d.id })))),
-      listarUsuarios: async () => (await getDocs(collection(db, "usuarios"))).docs.map(d => ({ ...d.data(), uid: d.id })),
+      escucharUsuarios: (cb, mal) => onSnapshot(collection(db, "usuarios"),
+        s => cb(s.docs.map(d => ({ ...d.data(), uid: d.id }))), mal),
       agregarAdmin: (u, nombre) => setDoc(doc(db, "admins", u), { nombre }),
       quitarAdmin: u => deleteDoc(doc(db, "admins", u)),
       escucharPartidos: cb => onSnapshot(collection(db, "partidos"), s => cb(s.docs.map(d => ({ ...d.data(), id: d.id })))),
@@ -488,6 +499,7 @@ function pintarTodo() {
     : "Un administrador tiene que crear el primero.";
   $("cardAdminPartido").hidden = !soyAdmin();
   $("cardAdmins").hidden = !soyAdmin();
+  $("cardUsuarios").hidden = !soyAdmin();
   if (!actual) return;
   $("fecha").textContent = "📅 " + fmt(fechaPartido) + (actual.lugar ? " · 📍 " + actual.lugar : "");
   pintarLista();
@@ -759,32 +771,57 @@ function pintarAdmins() {
   }
 }
 
-async function cargarUsuarios() {
-  const sel = $("selNuevoAdmin");
-  sel.replaceChildren(new Option("Elegí un usuario…", ""));
-  try {
-    const esAdmin = new Set(admins.map(a => a.uid));
-    const usuarios = (await backend.listarUsuarios())
-      .filter(u => !esAdmin.has(u.uid))
-      .sort((x, y) => (x.nombre || "").localeCompare(y.nombre || ""));
-    for (const u of usuarios) {
-      const fecha = u.creado ? " · desde " + new Date(u.creado).toLocaleDateString("es-AR") : "";
-      sel.add(new Option(`${u.nombre} (${codigoCorto(u.uid)}${fecha})`, u.uid));
-    }
-    if (!usuarios.length) sel.replaceChildren(new Option("No hay otros usuarios registrados", ""));
-  } catch (err) { $("msgAdmins").textContent = errorTexto(err); }
-}
-$("cardAdmins").querySelector("details").addEventListener("toggle", e => { if (e.target.open) cargarUsuarios(); });
+// ---------- Usuarios registrados (sólo administradores) ----------
+let usuarios = [], dejarUsuarios = null;
+const fechaCorta = t => t ? new Date(t).toLocaleDateString("es-AR") : "";
 
-$("btnNuevoAdmin").onclick = async () => {
-  const sel = $("selNuevoAdmin"), u = sel.value;
-  $("msgAdmins").textContent = "";
-  if (!u || !soyAdmin()) return;
-  const nombre = sel.selectedOptions[0].text.replace(/ \(….*$/, "");
-  if (!confirm(`¿Designar a ${nombre} como administrador?`)) return;
-  try { await backend.agregarAdmin(u, nombre); await cargarUsuarios(); }
-  catch (err) { $("msgAdmins").textContent = errorTexto(err); }
-};
+function vigilarUsuarios() {
+  if (soyAdmin() && !dejarUsuarios) {
+    dejarUsuarios = backend.escucharUsuarios(
+      l => { usuarios = l; pintarUsuarios(); },
+      err => { $("msgUsuarios").textContent = errorTexto(err); });
+  } else if (!soyAdmin() && dejarUsuarios) {
+    dejarUsuarios(); dejarUsuarios = null; usuarios = [];
+  }
+}
+
+function pintarUsuarios() {
+  const esAdmin = new Set(admins.map(a => a.uid));
+  const filtro = limpiar($("buscarUsuario").value).toLowerCase();
+  const lista = usuarios
+    .filter(u => !filtro || (u.nombre || "").toLowerCase().includes(filtro))
+    .sort((x, y) => (x.nombre || "").localeCompare(y.nombre || ""));
+  $("cantUsuarios").textContent = usuarios.length;
+  const ul = $("listaUsuarios");
+  ul.replaceChildren();
+  for (const u of lista) {
+    const li = document.createElement("li");
+    const info = document.createElement("span"); info.className = "info";
+    const n = document.createElement("b");
+    n.textContent = (u.nombre || "(sin nombre)") + (esAdmin.has(u.uid) ? " 🔑" : "") + (u.uid === miUid ? " (vos)" : "");
+    const d = document.createElement("small");
+    d.textContent = (u.creado ? "Desde " + fechaCorta(u.creado) + " · " : "") + "código " + codigoCorto(u.uid);
+    info.append(n, d);
+    li.append(info);
+    if (!esAdmin.has(u.uid)) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "sec mini"; b.textContent = "🔑 Designar";
+      b.onclick = async () => {
+        if (!soyAdmin() || !confirm(`¿Designar a ${u.nombre} como administrador?`)) return;
+        try { await backend.agregarAdmin(u.uid, u.nombre); }
+        catch (err) { $("msgUsuarios").textContent = errorTexto(err); }
+      };
+      li.append(b);
+    }
+    ul.append(li);
+  }
+  if (!lista.length) {
+    const li = document.createElement("li");
+    li.textContent = filtro ? "Nadie coincide con la búsqueda." : "Todavía no hay usuarios registrados.";
+    ul.append(li);
+  }
+}
+$("buscarUsuario").addEventListener("input", pintarUsuarios);
 
 function pintarMiUsuario() {
   $("miUsuarioTexto").textContent = miNombre
@@ -822,6 +859,8 @@ try {
   backend.escucharAdmins(lista => {
     admins = lista;
     pintarAdmins();
+    vigilarUsuarios();
+    pintarUsuarios();
     pintarMiUsuario();
     pintarTodo();
   });
